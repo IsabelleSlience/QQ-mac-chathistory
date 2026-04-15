@@ -7,6 +7,12 @@
 - 读取 `nt_db` 目录中的加密数据库
 - 按“每个联系人一个文件 / 每个群一个文件”的方式导出为适合 ChatGPT 结构化分析的 `CSV`
 
+它也提供一部分**研究辅助能力**：
+
+- `wrapper.node` 静态字符串/标记扫描
+- 单会话时间范围校验
+- 面向 Mac QQ / NTQQ 的研究流程文档
+
 这个仓库**不包含你的真实数据库密钥**，也**不会自动替你提取密钥**。  
 你需要先自行拿到运行时数据库 key，再把它作为参数传给工具。
 
@@ -85,6 +91,23 @@ cargo run --bin query_conversation -- \
 - 最晚时间
 - 前几条记录的发送者信息
 
+### 3. 静态检查 wrapper.node
+
+```bash
+cargo run --bin inspect_wrapper -- \
+  --wrapper "/Applications/QQ.app/Contents/Resources/app/wrapper.node" \
+  --verbose
+```
+
+它不会自动提取 key，但会帮助你确认：
+
+- `nt_sqlite3_key_v2`
+- `sqlcipher`
+- `codec`
+- `set_pass`
+
+这类标记是否仍出现在当前版本的 `wrapper.node` 中。
+
 ## CSV 字段
 
 每个会话文件都包含这些列：
@@ -113,6 +136,7 @@ cargo run --bin query_conversation -- \
 这部分单独写在：
 
 - [docs/macos-key-extraction.md](./docs/macos-key-extraction.md)
+- [docs/research-workflow.md](./docs/research-workflow.md)
 
 ## 适用范围
 
@@ -124,6 +148,7 @@ cargo run --bin query_conversation -- \
 - 当前更适合作为研究和数据导出工具
 - 已经能覆盖很多私聊和部分群聊场景
 - 针对损坏页面做了“按会话单独导出”的容错
+- 已经包含可公开的研究辅助脚手架
 - 未来还可以继续补：
   - 自动提取 key
   - 更稳定的群聊恢复
