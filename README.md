@@ -1,44 +1,62 @@
 # qq-mac-export-tools
 
-一个面向新版 macOS QQ / NTQQ 本地数据库的研究型导出工具。
+Research-oriented tooling for inspecting and exporting local chat history from recent macOS QQ / NTQQ databases.
 
-它做两件事：
+This repository focuses on two things:
 
-- 读取 `nt_db` 目录中的加密数据库
-- 按“每个联系人一个文件 / 每个群一个文件”的方式导出为适合 ChatGPT 结构化分析的 `CSV`
+- **database-side analysis** for recent Mac QQ / NTQQ local storage
+- **conversation-level export** into formats that are easier to inspect with tools like ChatGPT, pandas, or SQLite
 
-它也提供一部分**研究辅助能力**：
+It is intentionally **not** a one-click secret extractor.  
+The repository is designed to be publishable, reviewable, and reusable as a research toolkit.
 
-- `wrapper.node` 静态字符串/标记扫描
-- 单会话时间范围校验
-- 面向 Mac QQ / NTQQ 的研究流程文档
+## What This Project Provides
 
-这个仓库**不包含你的真实数据库密钥**，也**不会自动替你提取密钥**。  
-你需要先自行拿到运行时数据库 key，再把它作为参数传给工具。
+- Auto-detection of common macOS QQ `nt_db` directories
+- Read-only opening of encrypted NTQQ databases once you already have a valid key
+- Per-conversation CSV export for direct chats and groups
+- Naming rules tuned for real-world review workflows:
+  - direct chats prefer **remark**
+  - otherwise **nickname + QQ number**
+  - groups prefer **group name + group number**
+- Conversation-by-conversation export to reduce the blast radius of malformed pages
+- Research helpers for `wrapper.node` inspection
+- Small verification tools for checking whether a candidate key really matches a target database
 
-## 当前能力
+## What This Project Does Not Provide
 
-- 自动探测常见的 macOS QQ `nt_db` 目录
-- 读取 `nt_msg.db`、`profile_info.db`
-- 私聊文件命名优先用“备注”
-- 如果没有备注，则使用“昵称__QQ号”
-- 群聊文件命名优先用“群名__群号”
-- 每个会话单独导出，尽量绕开局部坏页
-- 生成 `direct_index.csv`、`group_index.csv`
-- 如果某些群聊或私聊命中坏页，会记录到 `*_errors.csv`
+- It does **not** ship any real user key
+- It does **not** claim universal compatibility with every QQ build
+- It does **not** currently provide a one-click Mac key extraction implementation
 
-## 已知限制
+That boundary is deliberate. The goal here is to keep the repository useful and reusable without turning it into a low-friction secret extraction package.
 
-- 本仓库目前**不自动提取 Mac QQ 数据库 key**
-- 如果数据库局部损坏，部分会话仍可能失败
-- 当前更偏“研究/取证工具”，不是面向普通用户的一键 GUI 应用
+## Why CSV Instead of Excel
 
-## 环境
+This project exports to **CSV** on purpose.
 
-- macOS
-- Rust stable
+Compared with Excel workbooks, CSV is better for:
 
-## 安装
+- ChatGPT uploads and structured review
+- pandas / Python pipelines
+- quick shell processing
+- diffing and versioning
+- per-conversation file splitting
+
+## Repository Layout
+
+```text
+src/bin/export_latest_csv.rs    # export one CSV per conversation
+src/bin/query_conversation.rs   # verify date ranges and counts for a single direct chat
+src/bin/inspect_wrapper.rs      # statically inspect wrapper.node markers
+src/lib.rs                      # shared database helpers
+docs/macos-key-extraction.md    # key extraction notes and boundaries
+docs/research-workflow.md       # end-to-end research workflow
+```
+
+## Quick Start
+
+### Build
 
 ```bash
 git clone https://github.com/YOUR_NAME/qq-mac-export-tools.git
@@ -46,21 +64,18 @@ cd qq-mac-export-tools
 cargo build --release
 ```
 
-## 用法
-
-### 1. 导出全部会话为 CSV
+### Export All Conversations to CSV
 
 ```bash
-export QQ_DB_KEY='YOUR_16_BYTE_KEY'
 cargo run --bin export_latest_csv -- \
-  --key "$QQ_DB_KEY" \
+  --key "YOUR_16_BYTE_KEY" \
   --db-root "/Users/you/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/nt_qq_xxx/nt_db" \
   --output "./exports"
 ```
 
-如果不传 `--db-root`，程序会尝试自动探测最新的 `nt_db` 目录。
+If `--db-root` is omitted, the tool will try to auto-detect the latest `nt_db` directory under the current macOS user profile.
 
-导出完成后，目录结构类似：
+Typical output:
 
 ```text
 exports/
@@ -75,23 +90,22 @@ exports/
   README.txt
 ```
 
-### 2. 检查单个私聊会话是否包含老记录
+### Check a Single Direct Conversation
 
 ```bash
-export QQ_DB_KEY='YOUR_16_BYTE_KEY'
 cargo run --bin query_conversation -- \
-  --key "$QQ_DB_KEY" \
+  --key "YOUR_16_BYTE_KEY" \
   u_xxxxxxxxxxxxxxxxxxxxx
 ```
 
-输出会显示：
+This prints:
 
-- 消息总数
-- 最早时间
-- 最晚时间
-- 前几条记录的发送者信息
+- total message count
+- earliest timestamp
+- latest timestamp
+- a few sample rows for sanity-checking
 
-### 3. 静态检查 wrapper.node
+### Inspect `wrapper.node`
 
 ```bash
 cargo run --bin inspect_wrapper -- \
@@ -99,18 +113,17 @@ cargo run --bin inspect_wrapper -- \
   --verbose
 ```
 
-它不会自动提取 key，但会帮助你确认：
+This helper does **not** extract a runtime key for you.  
+It helps you quickly see whether the current build still exposes useful markers such as:
 
 - `nt_sqlite3_key_v2`
 - `sqlcipher`
 - `codec`
 - `set_pass`
 
-这类标记是否仍出现在当前版本的 `wrapper.node` 中。
+## Export Format
 
-## CSV 字段
-
-每个会话文件都包含这些列：
+Each conversation CSV includes:
 
 - `conversation_id`
 - `conversation_number`
@@ -125,37 +138,43 @@ cargo run --bin inspect_wrapper -- \
 - `send_status`
 - `message_summary`
 
-这套格式比 Excel 更适合：
+## Research Docs
 
-- ChatGPT 上传分析
-- Python / pandas 二次处理
-- 批量搜索、筛选、按时间拆分
+- [MacOS Key Extraction Notes](./docs/macos-key-extraction.md)
+- [Research Workflow](./docs/research-workflow.md)
 
-## 关于密钥提取
+These docs are meant to help people reproduce the **analysis process**, not just consume a finished exporter.
 
-这部分单独写在：
+## Current Scope
 
-- [docs/macos-key-extraction.md](./docs/macos-key-extraction.md)
-- [docs/research-workflow.md](./docs/research-workflow.md)
+This repository has been validated against recent Mac QQ / NTQQ local database layouts in practice, but results may still vary depending on:
 
-## 适用范围
+- QQ version
+- database layout changes
+- active WAL state
+- malformed pages
+- symbol stripping or wrapper changes
 
-这套流程是在新版 Mac QQ / NTQQ 本地数据库上实测跑通的。  
-不同 QQ 版本、不同数据库布局、不同损坏程度下，结果可能不同。
+## Known Limitations
 
-## 项目状态
+- Some malformed pages can still break specific conversations
+- Group export may be less complete than direct-chat export on damaged databases
+- Key extraction is still documented as a research workflow rather than packaged as a one-click implementation
 
-- 当前更适合作为研究和数据导出工具
-- 已经能覆盖很多私聊和部分群聊场景
-- 针对损坏页面做了“按会话单独导出”的容错
-- 已经包含可公开的研究辅助脚手架
-- 未来还可以继续补：
-  - 自动提取 key
-  - 更稳定的群聊恢复
-  - 更完整的消息类型解析
+## Roadmap
 
-## 安全提醒
+- Improve malformed-page recovery
+- Improve group-chat export resilience
+- Expand message-type parsing and summaries
+- Add stronger wrapper inspection and reporting tools
+- Continue documenting reproducible Mac QQ research workflows
 
-- 不要把你的真实 key 提交到 GitHub
-- 不要把原始数据库直接公开上传
-- 不要把含有私人聊天记录的导出结果直接推送到公共仓库
+## Safety Notes
+
+- Do **not** commit your real database key
+- Do **not** publish raw databases
+- Do **not** push private exports containing personal chat history to a public repository
+
+## License
+
+[MIT](./LICENSE)
