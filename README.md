@@ -49,9 +49,12 @@ Compared with Excel workbooks, CSV is better for:
 src/bin/export_latest_csv.rs    # export one CSV per conversation
 src/bin/query_conversation.rs   # verify date ranges and counts for a single direct chat
 src/bin/inspect_wrapper.rs      # statically inspect wrapper.node markers
+src/bin/validate_key.rs         # validate a candidate key and summarize database access
 src/lib.rs                      # shared database helpers
 docs/macos-key-extraction.md    # key extraction notes and boundaries
 docs/research-workflow.md       # end-to-end research workflow
+docs/automation-roadmap.md      # path from toolkit to user-facing product
+docs/tauri-core-architecture.md # Tauri-oriented app/core split
 ```
 
 ## Quick Start
@@ -121,6 +124,23 @@ It helps you quickly see whether the current build still exposes useful markers 
 - `codec`
 - `set_pass`
 
+### Validate a Candidate Key
+
+```bash
+cargo run --bin validate_key -- \
+  --key "YOUR_16_BYTE_KEY" \
+  --db-root "/Users/you/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/nt_qq_xxx/nt_db"
+```
+
+This is meant to be the first “real automation” step in the workflow.
+
+It reports:
+
+- which databases could be opened
+- whether expected tables exist
+- rough message time ranges
+- whether the candidate key is likely usable for export
+
 ## Export Format
 
 Each conversation CSV includes:
@@ -142,6 +162,8 @@ Each conversation CSV includes:
 
 - [MacOS Key Extraction Notes](./docs/macos-key-extraction.md)
 - [Research Workflow](./docs/research-workflow.md)
+- [Automation Roadmap](./docs/automation-roadmap.md)
+- [Tauri Core Architecture](./docs/tauri-core-architecture.md)
 
 These docs are meant to help people reproduce the **analysis process**, not just consume a finished exporter.
 
@@ -160,6 +182,7 @@ This repository has been validated against recent Mac QQ / NTQQ local database l
 - Some malformed pages can still break specific conversations
 - Group export may be less complete than direct-chat export on damaged databases
 - Key extraction is still documented as a research workflow rather than packaged as a one-click implementation
+- The current direction is assisted automation with explicit user confirmation, not silent secret extraction
 
 ## Roadmap
 
@@ -168,6 +191,7 @@ This repository has been validated against recent Mac QQ / NTQQ local database l
 - Expand message-type parsing and summaries
 - Add stronger wrapper inspection and reporting tools
 - Continue documenting reproducible Mac QQ research workflows
+- Move toward a Tauri-based local-first Mac client
 
 ## Safety Notes
 

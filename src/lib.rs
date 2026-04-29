@@ -12,6 +12,15 @@ use std::path::{Path, PathBuf};
 pub const DEFAULT_QQ_CONTAINER_ROOT: &str =
     "Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ";
 
+pub fn nt_db_candidates(db_root: &Path) -> Vec<(&'static str, PathBuf)> {
+    vec![
+        ("nt_msg", db_root.join("nt_msg.db")),
+        ("profile_info", db_root.join("profile_info.db")),
+        ("group_info", db_root.join("group_info.db")),
+        ("recent_contact", db_root.join("recent_contact.db")),
+    ]
+}
+
 pub fn resolve_nt_db_root(user_provided: Option<&Path>) -> Result<PathBuf> {
     if let Some(path) = user_provided {
         return Ok(path.to_path_buf());
@@ -62,6 +71,20 @@ pub fn open_encrypted_db(path: &Path, key: &str) -> Result<Connection> {
     )
     .with_context(|| format!("decrypt db {}", path.display()))?;
     Ok(conn)
+}
+
+pub fn table_exists(conn: &Connection, table_name: &str) -> Result<bool> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT EXISTS(
+            SELECT 1
+            FROM sqlite_master
+            WHERE type='table' AND name=?
+        )
+        "#,
+    )?;
+    let exists: i64 = stmt.query_row([table_name], |row| row.get(0))?;
+    Ok(exists == 1)
 }
 
 pub fn summarize_message_from_row(row: &rusqlite::Row, column: &str, msg_type: i64, sub_msg_type: i64) -> rusqlite::Result<String> {
